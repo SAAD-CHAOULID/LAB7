@@ -136,34 +136,3 @@ MobSF inclut des **scripts Frida auxiliaires** (ex: bypass de détection d'émul
 
 **Figure 14 :** Instrumentation via sélection d'activité.
 
-Vous pouvez également visualiser le code du script injecté pour le débogage.
-
-![Script Frida injecté](./Images/13.png)
-
-**Figure 15 :** Script Frida injecté.
-
----
-
-## 6. Outils Complémentaires
-
-L'interface dynamique de MobSF propose d'autres onglets d'analyse : observation du trafic HTTP(S), Dumpsys, accès aux données internes et un shell Android direct.
-
-![Vue outils dynamiques](./Images/14.png)
-
-**Figure 16 :** Vue des outils dynamiques de MobSF.
-
----
-
-## 🚀 Commandes Rapides
-
-```bash
-# Se placer dans le répertoire de MobSF
-cd /home/mobexler/Mobile-Security-Framework-MobSF
-
-# Lancer MobSF (avec ADB pointant vers le proxy Windows)
-export MOBSF_ANALYZER_IDENTIFIER=192.168.100.12:5555
-./run.sh 0.0.0.0:8000
-
-# Accès Web (IP de la VM)
-http://192.168.100.103:8000
-```
