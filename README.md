@@ -1,13 +1,31 @@
-# MobSF avec Docker Desktop et Android Emulator 
+# MobSF : Analyse avec Architecture Distribuée (Windows & Mobexler)
 
 ## 📌 Présentation
 
-Ce document présente la mise en place de **MobSF (Mobile Security Framework)** sur **Windows** avec **Docker Desktop** et un **émulateur Android**, puis son utilisation pour réaliser une **analyse statique** et une **analyse dynamique** de l'application **DIVA (Damn Insecure and Vulnerable App)**.
+Ce document présente la mise en place de **MobSF (Mobile Security Framework)** pour réaliser une **analyse statique** et une **analyse dynamique** de l'application **DIVA (Damn Insecure and Vulnerable App)**.
+
+Nous utilisons ici une **architecture distribuée** particulière, conçue pour faire communiquer un émulateur hébergé sur une machine hôte Windows avec une instance MobSF conteneurisée sur une machine virtuelle Linux (Mobexler) :
+
+```text
+L'architecture finale :
+Machine Hôte Windows (192.168.100.12)
+ └── Android Studio AVD (émulateur)
+      └── ADB écoute sur 127.0.0.1:5555
+               ↑
+          Port Proxy Windows
+          redirige 0.0.0.0:5555 → 127.0.0.1:5555
+               ↑
+          Réseau WiFi (192.168.100.x)
+               ↑
+Machine Mobexler VirtualBox (192.168.100.103)
+ └── MobSF (Natif)
+      └── ADB connecté à 192.168.100.12:5555
+```
 
 L'objectif est de montrer un workflow simple pour :
 
-* préparer l'environnement et lancer MobSF (Docker)
-* connecter un émulateur Android
+* configurer le proxy ADB sur Windows
+* connecter un émulateur Android distant à MobSF (VM)
 * analyser une APK en statique et dynamique
 * utiliser les tests TLS/SSL et les outils Frida intégrés
 * consulter logs et résultats
@@ -16,61 +34,49 @@ L'objectif est de montrer un workflow simple pour :
 
 ## 🛠️ Prérequis
 
-Avant de commencer, il faut disposer de :
+Avant de commencer, voici la configuration requise :
 
-* **Docker Desktop** installé et démarré
-* **Android Studio** avec au moins un **AVD**
-* **Git**
-* l'application **DIVA** (ou autre APK)
+* **Machine Hôte (Windows - 192.168.100.12)** :
+  * **Android Studio** avec au moins un **AVD**
+  * Une règle de proxy/port-forwarding configurée pour exposer ADB
+  * L'application **DIVA** (ou autre APK)
+* **Machine Virtuelle (Mobexler - 192.168.100.103)** :
+  * Instanciation complète de **Mobexler** (qui intègre nativement MobSF)
+  * Connectivité réseau vers l'hôte Windows
 
 ---
 
-## 1. Préparation de l'environnement (Docker & Émulateur)
+## 1. Préparation de l'environnement (Émulateur et Proxy Windows)
 
-Avant de lancer l'analyse, assurez-vous que **Docker Desktop** fonctionne correctement et qu'un **Android Virtual Device (AVD)** est démarré via le Device Manager d'Android Studio. L'émulateur est indispensable pour l'analyse dynamique.
-
-![Docker Desktop](./Images/1.png)
-
-**Figure 1 :** Docker Desktop en cours d'exécution.
+Sur la machine Windows, assurez-vous qu'un **Android Virtual Device (AVD)** est démarré via le Device Manager d'Android Studio. Cet émulateur reste indispensable pour l'analyse dynamique.
 
 ![Android Device Manager](./Images/2.png)
 
-**Figure 2 :** Émulateurs Android disponibles.
+**Figure 1 :** Émulateurs Android disponibles sur Windows.
+
+**Redirection de port ADB :**
+Par défaut, ADB écoute sur `127.0.0.1:5555`. Pour rendre l'émulateur accessible à la machine virtuelle, un tunnel proxy a été configuré sur Windows. Le trafic reçu sur `0.0.0.0:5555` est directement redirigé vers l'interface locale `127.0.0.1:5555`.
 
 ---
 
-## 2. Installation et Lancement de MobSF
+## 2. Configuration et Lancement de MobSF (sur VM Mobexler)
 
-Clonez le dépôt officiel de MobSF, puis lancez-le via Docker en connectant l'émulateur Android :
+Sur votre machine Mobexler (192.168.100.103), MobSF est généralement déjà pré-installé. Vous avez simplement besoin d'indiquer l'adresse de votre proxy ADB Windows avant de le démarrer.
+
+Depuis le répertoire de MobSF, exportez la variable d'environnement puis lancez le script serveur `run.sh` :
 
 ```bash
-git clone https://github.com/MobSF/Mobile-Security-Framework-MobSF.git
-cd Mobile-Security-Framework-MobSF
+cd /home/mobexler/Mobile-Security-Framework-MobSF  # Ou le chemin de l'installation existante
+export MOBSF_ANALYZER_IDENTIFIER=192.168.100.12:5555
+./run.sh 0.0.0.0:8000
 ```
 
-![Clonage du projet MobSF](./Images/3.png)
-
-**Figure 3 :** Clonage du dépôt.
-
-Lancez le conteneur en spécifiant l'identifiant de votre émulateur :
-
-```powershell
-docker run -it `
-  -p 8000:8000 -p 1337:1337 `
-  -v mobsf_data:/home/mobsf/.MobSF `
-  -e MOBSF_ANALYZER_IDENTIFIER=emulator-5554 `
-  opensecurity/mobile-security-framework-mobsf:latest
-```
-
-MobSF télécharge l'image, initialise l'environnement et démarre son serveur web sur le port **8000**.
-
-![Téléchargement de l'image Docker](./Images/4.png)
-
-**Figure 4 :** Téléchargement de l'image.
+MobSF initialise son environnement sur la VM et démarre le serveur web sur le port **8000**, tout en reliant nativement ADB à travers le réseau WiFi.
 
 ![Logs de démarrage MobSF](./Images/4-2.png)
 
-**Figure 5 :** Logs de démarrage (serveur sur le port 8000).
+**Figure 2 :** Logs de démarrage MobSF (serveur sur le port 8000).
+
 
 ---
 
@@ -151,13 +157,13 @@ L'interface dynamique de MobSF propose d'autres onglets d'analyse : observation 
 ## 🚀 Commandes Rapides
 
 ```bash
-# Cloner MobSF
-git clone https://github.com/MobSF/Mobile-Security-Framework-MobSF.git
-cd Mobile-Security-Framework-MobSF
+# Se placer dans le répertoire de MobSF
+cd /home/mobexler/Mobile-Security-Framework-MobSF
 
-# Lancer MobSF via Docker
-docker run -it -p 8000:8000 -p 1337:1337 -v mobsf_data:/home/mobsf/.MobSF -e MOBSF_ANALYZER_IDENTIFIER=emulator-5554 opensecurity/mobile-security-framework-mobsf:latest
+# Lancer MobSF (avec ADB pointant vers le proxy Windows)
+export MOBSF_ANALYZER_IDENTIFIER=192.168.100.12:5555
+./run.sh 0.0.0.0:8000
 
-# Accès Web
-http://127.0.0.1:8000
+# Accès Web (IP de la VM)
+http://192.168.100.103:8000
 ```
